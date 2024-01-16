@@ -1,0 +1,12 @@
+# Format for each row: name in config.py; alias; range to search
+# No spaces, except between these 3 fields
+# Line breaks are used to union different grid search spaces
+# Feel free to add '#' to add comments
+
+dataset.name dataset ['TU_ENZYMES']
+model.type type ['GCN']
+gnn.layers_mp l_mp [1,2,3,4,5,6]
+gnn.dim_inner dim_in [64]
+dataset.count_type c_type ['HOM','ISO']
+dataset.add_counts add_counts [True]
+dataset.patterns patterns ['2-path,3-path,4-path,5-path','triangle,4-cycle,5-cycle,6-cycle','triangle,4-clique,5-clique,6-clique']

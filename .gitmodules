@@ -1,0 +1,3 @@
+[submodule "DISC"]
+	path = DISC
+	url = git@github.com:seanli3/DISC.git

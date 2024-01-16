@@ -1,0 +1,64 @@
+#
+# Copyright (C)  2020  University of Pisa
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
+model:
+  - GIN
+device:
+  - cpu
+walk:
+  - bfs
+hops:
+  - 1
+batch_size:
+  - 1024
+learning_rate:
+  - 0.01
+classifier_epochs:
+  - 5000
+hidden_units:  # Note: GIN add a first layer that simply adds up all node features
+  - [64, 64, 64, 64, 64]
+optimizer:
+  - SGD
+scheduler:
+  -
+    class: StepLR
+    args:
+      step_size: 50
+      gamma: 0.5
+loss:
+  - MulticlassClassificationLoss
+train_eps:
+  - true
+l2:
+  - 0.
+aggregation:
+  - sum
+gradient_clipping:
+  - null
+dropout:
+  - 0.5
+early_stopper:
+  -
+    class: Patience
+    args:
+      patience: 10000
+      use_loss: True
+shuffle:
+  - True
+resume:
+  - False
+random_labels:
+  - False

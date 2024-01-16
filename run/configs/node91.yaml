@@ -1,0 +1,38 @@
+# The recommended basic settings for GNN
+out_dir: results
+accelerator: 'cuda'
+devices: [0]
+dataset:
+  format: PyG
+  dir: ../data
+  name: PubMed
+  task: node
+  task_type: classification
+  transductive: true
+  split: [0.9, 0.1]
+  transform: none
+train:
+  batch_size: 128
+  eval_period: 1000
+  ckpt_period: 1000
+  enable_ckpt: false
+model:
+  type: GCN
+  loss_fun: cross_entropy
+  graph_pooling: add
+gnn:
+  layers_pre_mp: 1
+  layers_mp: 2
+  layers_post_mp: 1
+  dim_inner: 64
+  layer_type: generalconv
+  stage_type: stack
+  batchnorm: true
+  act: prelu
+  dropout: 0.0
+  agg: add
+  normalize_adj: false
+optim:
+  optimizer: adam
+  base_lr: 0.01
+  max_epoch: 500

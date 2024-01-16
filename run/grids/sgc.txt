@@ -1,0 +1,12 @@
+# Format for each row: name in config.py; alias; range to search
+# No spaces, except between these 3 fields
+# Line breaks are used to union different grid search spaces
+# Feel free to add '#' to add comments
+
+
+dataset.name dataset ['Cora','PubMed']
+model.type type ['SGC']
+gnn.layers_mp l_mp [1,2,3,4,5]
+gnn.dim_inner dim_in [64]
+gnn.dropout dropout [0.2]
+
