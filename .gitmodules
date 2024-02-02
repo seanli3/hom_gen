@@ -1,3 +1,6 @@
 [submodule "DISC"]
 	path = DISC
 	url = git@github.com:seanli3/DISC.git
+[submodule "homlib"]
+	path = homlib
+	url = git@github.com:spaghetti-source/homlib.git

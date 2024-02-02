@@ -12,6 +12,8 @@ import os
 import math
 from collections import Counter, defaultdict
 from numpy import linalg as LA
+import pathlib
+from scipy.special import kl_div
 
 
 # https://mail.python.org/pipermail/scipy-user/2011-May/029521.html
@@ -106,14 +108,14 @@ class DotDict(dict):
 
 def get_dataset(dataset_name, split=[0.6, 0.4]):
     if dataset_name in ['Cora', 'CiteSeer', 'PubMed']:
-        dataset_raw = Planetoid(f'{os.path.dirname(__file__)}/../data/Planetoid', dataset_name)
+        dataset_raw = Planetoid(f'{pathlib.Path(__file__).parent.resolve()}/../data/Planetoid', dataset_name)
     elif dataset_name.startswith('SBM_PATTERN'):
-        with open(f'{os.path.dirname(__file__)}/../../LGP-GNN/data/SBMs/PATTERN/'+dataset_name+'.pkl',"rb") as f:
+        with open(f'{pathlib.Path(__file__).parent.resolve()}/../../LGP-GNN/data/SBMs/'+dataset_name+'.pkl',"rb") as f:
             f = pickle.load(f)
             dataset_raw = f[0]
         return dataset_raw
     else:
-        dataset_raw = TUDataset(f'{os.path.dirname(__file__)}/../data/TUDataset', dataset_name, use_node_attr=True)
+        dataset_raw = TUDataset(f'{pathlib.Path(__file__).parent.resolve()}/../data/TUDataset', dataset_name, use_node_attr=True)
     if len(dataset_raw)>1:
         # graph dataset
         del dataset_raw.data.train_graph_index
@@ -201,15 +203,18 @@ def get_f_pattern_wl_features(dataset, patterns=original_patterns.keys(), iterat
 def get_wl_features(dataset, iterations=None, use_node_attr=True):
     graph_canonical_forms = []
     colors = []
-    test = set()
+    unique_graph_colors = set()
+    unique_node_colors = set()
     for idx in range(len(dataset)):
         graph = to_networkx(dataset[idx])
         canonical_form, node_color_his, graph_color_his = WL(graph, verbose=False, iterations=iterations)
-        test.add(tuple(canonical_form))
+        unique_graph_colors.add(tuple(canonical_form))
+        unique_node_colors.update(set(map(lambda c:c[0], graph_color_his[-1])))
         graph_canonical_forms.append(graph_color_his)
         colors.append(get_node_feature_from_colors(dataset[idx].x, node_color_his, use_node_attr=use_node_attr))
 
-    print('# of unique canonical forms: ', len(test))
+    print('# of unique graph canonical forms: ', len(unique_graph_colors))
+    print('# of unique node colors: ', len(unique_node_colors))
     return get_features_from_canonical_forms(len(dataset), graph_canonical_forms), colors
 
 def get_kwl_features(dataset, k=3, iterations=None, use_node_attr=True):
@@ -274,68 +279,82 @@ def get_node_feature_from_colors(node_attr, colors, normalize=True, use_node_att
     return features
 
 
-def get_bound_graph(dataset, get_graph_feature_func, train_idx=None, seed=1):
+def compute_graph_bound(num_classes, graph_features, y, train_idx=None, seed=1, lip_margin_constant=3):
     bounds = []
     np.random.seed(seed)
-    features, _ = get_graph_feature_func()
     delta = 0.01
-    lip_margin_constant = 4
     m = 0
-    for c in range(dataset.num_classes):
-        candidates = train_idx if train_idx is not None else torch.range(len(dataset))
-        candidates = candidates[dataset.data.y[candidates] == c]
+    for c in range(num_classes):
+        candidates = train_idx if train_idx is not None else torch.range(len(y))
+        candidates = candidates[y[candidates] == c]
         sample_size = min(len(candidates), 100)
         c_idx = np.random.choice(candidates, sample_size, replace=False)
-        num_samples = int(len(c_idx)/2)
+        num_samples = int(len(c_idx) / 2)
         dkl = KLdivergence(
-            features[c_idx[:num_samples]],
-            features[c_idx[num_samples:num_samples * 2]],
+            graph_features[c_idx[:num_samples]],
+            graph_features[c_idx[num_samples:num_samples * 2]],
         )
-        dist = torch.cdist(features[c_idx], features[c_idx])
+        dist = torch.cdist(graph_features[c_idx], graph_features[c_idx])
         diameter = dist.max().item()
-        dkl_tilde = diameter*math.sqrt(min(dkl/2, 1-torch.exp(-torch.tensor(dkl))))/num_samples
+        dkl_tilde = diameter * math.sqrt(min(dkl / 2, 1 - torch.exp(-torch.tensor(dkl)))) / num_samples
         print(f'dkl: {dkl}, diameter: {diameter}, dkl_tilde: {dkl_tilde}')
         bound = (dkl_tilde +
                  2 * diameter * math.sqrt(
-                    math.log(2 * dataset.num_classes / delta, 10) /
+                    math.log(2 * num_classes / delta, 10) /
                     (num_samples * math.floor(len(candidates) / 2 / num_samples))
                 )) * lip_margin_constant
         bounds.append(bound)
-        m += math.floor(len(candidates)/2/num_samples)
-    bound = sum(bounds)/len(bounds) + math.sqrt(math.log(2/delta)/2/m)
+        m += math.floor(len(candidates) / 2 / num_samples)
+    bound = sum(bounds) / len(bounds) + math.sqrt(math.log(2 / delta) / 2 / m)
     # print(f'bound: {bound}')
     return bound
 
-def get_bound_node(dataset, get_graph_feature_func, train_idx=None, seed=1):
-    bounds = []
+
+def get_bound_graph(dataset, get_graph_feature_func, train_idx=None, seed=1):
     np.random.seed(seed)
-    _, node_features = get_graph_feature_func()
-    node_features = node_features[0]
+    features, _ = get_graph_feature_func()
+    return compute_graph_bound(dataset.num_classes, features, dataset.data.y, train_idx=train_idx, seed=seed)
+
+def compute_node_bound(num_classes, node_features, y, train_idx=None, seed=1, lip_margin_constant=6):
+    np.random.seed(seed)
     delta = 0.01
-    lip_margin_constant = 6
     m = 0
-    for c in range(dataset.num_classes):
-        candidates = train_idx if train_idx is not None else torch.range(len(dataset))
-        candidates = candidates[dataset.data.y[candidates] == c]
+    bounds = []
+    for c in range(num_classes):
+        candidates = train_idx if train_idx is not None else torch.range(len(y))
+        candidates = candidates[y[candidates] == c]
         sample_size = min(len(candidates), 300)
         c_idx = np.random.choice(candidates, sample_size, replace=False)
         num_samples = int(len(c_idx)/2)
-        dkl = KLdivergence(
-            node_features[c_idx[:num_samples]],
-            node_features[c_idx[num_samples:num_samples * 2]],
-        )
+        if len(node_features.shape) > 1:
+            dkl = KLdivergence(
+                node_features[c_idx[:num_samples]],
+                node_features[c_idx[num_samples:num_samples * 2]],
+            )
+        else:
+            min_val = node_features.min()
+            # scale to positive numbers
+            node_features -= min_val + 1e-5
+            dkl = sum(kl_div(node_features[c_idx[:num_samples]], node_features[c_idx[num_samples:num_samples * 2]]))
+            node_features = node_features.view(-1,1)
         dist = torch.cdist(node_features[c_idx], node_features[c_idx])
         diameter = dist.max().item()
         dkl_tilde = diameter*math.sqrt(min(dkl/2, 1-torch.exp(-torch.tensor(dkl))))/num_samples
         print(f'dkl: {dkl}, diameter: {diameter}, dkl_tilde: {dkl_tilde}')
         bound = (dkl_tilde +
                  2*diameter*math.sqrt(
-                    math.log(2*dataset.num_classes/delta, 10)/
+                    math.log(2*num_classes/delta, 10)/
                     (num_samples*math.floor(len(candidates)/2/num_samples))
                 ))*lip_margin_constant
         bounds.append(bound)
         m += math.floor(len(candidates)/2/num_samples)
     return sum(bounds)/len(bounds) + math.sqrt(math.log(2/delta)/2/m)
+
+def get_bound_node(dataset, get_graph_feature_func, train_idx=None, seed=1):
+    _, node_features = get_graph_feature_func()
+    np.random.seed(seed)
+    node_features = node_features[0]
+    return compute_node_bound(dataset.num_classes, node_features, dataset.data.y, train_idx=train_idx, seed=seed)
 
 def run_node_tests(dataset_name, iterations=None, seed=1, use_node_attr=True, c_type='HOM'):
     res = []
@@ -371,7 +390,7 @@ def run_pattern_tests(dataset_name, iterations=None, seed=1, use_node_attr=True,
     np.random.seed(seed)
     delta = 0.01
     lip_margin_constant = 6
-    c_idx = np.random.choice(range(len(dataset)), 100, replace=False)
+    c_idx = np.random.choice(range(len(dataset)), 25, replace=False)
     labels = []
     node_color_his_list = []
     for idx in c_idx:
@@ -464,6 +483,65 @@ def run_graph_tests(dataset_name, iterations=None, seed=1, use_node_attr=True, c
     return res
 
 
+def run_node_tests_sgc(dataset_name, K=1, seed=1, use_node_attr=True, c_type='HOM', normalize=True):
+    res = []
+    dataset = get_dataset(dataset_name)
+    node_features = []
+    for index in range(len(dataset)):
+        if c_type == 'HOM':
+            counts = get_graph_hom_counts(dataset_name, index, dataset[index].num_nodes, [f'{K}-path'])
+        elif c_type == 'ISO':
+            counts = get_graph_subgraph_counts(dataset_name, index, dataset[index].num_nodes, [f'{K}-path'])
+        hom_feature = torch.tensor([counts[i] for i in range(dataset[index].num_nodes)]).view(-1,1)
+        # hom_feature = torch.log10(hom_feature+1)
+        # m = torch.mean(hom_feature, dim=0)
+        # s = torch.std(hom_feature, dim=0)
+        # hom_feature = (hom_feature - m) / s
+        if use_node_attr:
+            node_feature = torch.cat((dataset[index].x, hom_feature), 1)
+        else:
+            node_feature = hom_feature
+        if normalize:
+            node_feature = torch.nn.functional.normalize(node_feature, dim=0, p=2)
+        node_features.append(node_feature)
+    node_features = torch.stack(node_features).squeeze()
+    bound_val = compute_node_bound(dataset.num_classes, node_features, dataset.data.y, train_idx=dataset.data.val_mask.nonzero().view(-1), seed=seed, lip_margin_constant=6)
+    print(f'K: {K}, bound: {bound_val}')
+    res.append([K, bound_val])
+    return res
+
+def run_graph_tests_sgc(dataset_name, K=1, seed=1, c_type='HOM', normalize=True):
+    res = []
+    dataset = get_dataset(dataset_name)
+    counts_set = set()
+    for index in range(len(dataset)):
+        if c_type == 'HOM':
+            counts = get_graph_hom_counts(dataset_name, index, dataset[index].num_nodes, [f'{K}-path'])
+        elif c_type == 'ISO':
+            counts = get_graph_subgraph_counts(dataset_name, index, dataset[index].num_nodes, [f'{K}-path'])
+        counts_set.update(counts.values())
+
+    counts_set = list(counts_set)
+    graph_features = torch.zeros(len(dataset), len(counts_set))
+    for index in range(len(dataset)):
+        if c_type == 'HOM':
+            counts = get_graph_hom_counts(dataset_name, index, dataset[index].num_nodes, [f'{K}-path'])
+        elif c_type == 'ISO':
+            counts = get_graph_subgraph_counts(dataset_name, index, dataset[index].num_nodes, [f'{K}-path'])
+        for key in counts:
+            graph_features[index, counts_set.index(counts[key])] += 1
+    if normalize:
+        graph_features = torch.log10(graph_features+1)
+        m = torch.mean(graph_features, dim=0)
+        s = torch.std(graph_features, dim=0)
+        graph_features = (graph_features - m) / s
+        graph_features = torch.nn.functional.normalize(graph_features, dim=0, p=2)
+    bound_val = compute_graph_bound(dataset.num_classes, graph_features, dataset.data.y, train_idx=dataset.data.train_graph_index, seed=seed, lip_margin_constant=3)
+    print(f'K: {K}, bound: {bound_val}')
+    res.append([K, bound_val])
+    return res
+
+
 if __name__ == '__main__':
     # for i in range(1,6):
     #     run_node_tests('CiteSeer', iterations=i)
@@ -471,21 +549,24 @@ if __name__ == '__main__':
     if os.path.exists(filepath):
         os.remove(filepath)
     # iterations = [7]
-    iterations = [None]
+    iterations = [2,3,4,5]
     with open(filepath, 'a') as f:
         f.writelines('dataset iteration patterns bound bound_std\n')
-        for dataset in ['SBM_PATTERN','SBM_PATTERN_345Cl','SBM_PATTERN_34Cl','SBM_PATTERN_5Cl']:
+        # for dataset in ['SBM_PATTERN','SBM_PATTERN_345Cl','SBM_PATTERN_34Cl','SBM_PATTERN_5Cl']:
         # for dataset in ['SBM_PATTERN_345Cl','SBM_PATTERN_34Cl','SBM_PATTERN_5Cl']:
-        # for dataset in ['ENZYMES','PROTEINS','PTC_MR']:
+        for dataset in ['ENZYMES','PROTEINS','PTC_MR']:
         # for dataset in ['Cora','CiteSeer','PubMed']:
             print(dataset)
             for iteration in iterations:
                 bounds = defaultdict(list)
-                for repeat in range(5):
-                    res = run_pattern_tests(dataset, iterations=iteration, seed=1+repeat, use_node_attr=True, c_type='HOM')
-                    # res = run_graph_tests(dataset, iterations=iteration, seed=1+repeat, use_node_attr=True, c_type='HOM')
+                for repeat in range(1):
+                    # res = run_pattern_tests(dataset, iterations=iteration, seed=1+repeat, use_node_attr=True, c_type='HOM')
+                    # res = run_graph_tests(dataset, iterations=iteration, seed=1+repeat, use_node_attr=True, c_type='ISO')
                     # res = run_node_tests(dataset, iterations=iteration, seed=1+repeat, use_node_attr=True, c_type='HOM')
+                    # res = run_node_tests_sgc(dataset, K=iteration, seed=1+repeat, use_node_attr=True, c_type='HOM')
+                    res = run_graph_tests_sgc(dataset, K=iteration, seed=1+repeat, c_type='HOM')
                     for r in res:
-                        bounds[','.join(r[0])].append(r[1])
+                        # bounds[','.join(r[0])].append(r[1])
+                        bounds[r[0]].append(r[1])
                 for key in bounds:
                     f.writelines(f'{dataset} {iteration} {key} {np.mean(bounds[key])} {np.std(bounds[key])}\n')

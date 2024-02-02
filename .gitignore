@@ -1,11 +1,9 @@
-**/data_dir/
 run/datasets/data/
 **/__pycache__/
 **/.ipynb_checkpoints
 .idea/
-/run/datasets/Cora/Cora/Cora/
-/run/results/example/
 /run/configs/example_node_grid_example/
 /run/datasets/
-/run/results/example_node_grid_example/
+/run/results/
 /rooted_hom_count/spark-2.4.8-bin-hadoop2.7/
+/data/
