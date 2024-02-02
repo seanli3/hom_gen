@@ -560,11 +560,11 @@ if __name__ == '__main__':
             for iteration in iterations:
                 bounds = defaultdict(list)
                 for repeat in range(1):
-                    # res = run_pattern_tests(dataset, iterations=iteration, seed=1+repeat, use_node_attr=True, c_type='HOM')
+                    res = run_pattern_tests(dataset, iterations=iteration, seed=1+repeat, use_node_attr=True, c_type='HOM')
                     # res = run_graph_tests(dataset, iterations=iteration, seed=1+repeat, use_node_attr=True, c_type='ISO')
                     # res = run_node_tests(dataset, iterations=iteration, seed=1+repeat, use_node_attr=True, c_type='HOM')
                     # res = run_node_tests_sgc(dataset, K=iteration, seed=1+repeat, use_node_attr=True, c_type='HOM')
-                    res = run_graph_tests_sgc(dataset, K=iteration, seed=1+repeat, c_type='HOM')
+                    # res = run_graph_tests_sgc(dataset, K=iteration, seed=1+repeat, c_type='HOM')
                     for r in res:
                         # bounds[','.join(r[0])].append(r[1])
                         bounds[r[0]].append(r[1])
