@@ -18,7 +18,7 @@ train:
   ckpt_period: 2000
   enable_ckpt: false
 model:
-  type: GCN
+  type: SGC
   loss_fun: cross_entropy
   graph_pooling: add
 gnn:

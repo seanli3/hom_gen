@@ -29,6 +29,8 @@ patterns = OrderedDict({
     # 'chordal-square-edge': "A-B;B-C;C-D;D-A;B-D;A-E;",
     # '4-clique-edge': "A-B;B-C;C-D;D-A;A-C;B-D;A-E;",
     # 6 nodes
+    '5-path': 'A-B;B-C;C-D;D-E;E-F;',
+    '5-star': 'A-B;A-C;A-D;A-E;A-F;',
     # 'quad-triangle': "A-B;B-C;C-D;D-E;E-F;F-A;B-D;B-E;B-F;",
     # 'triangle-core': "A-B;B-C;C-D;D-E;E-F;F-A;B-D;B-F;D-F;",
     # 'twin-c-square': "A-B;B-C;C-D;D-E;E-F;F-A;A-C;A-D;D-F;",
@@ -38,6 +40,7 @@ patterns = OrderedDict({
     '6-clique': 'A-B;A-C;A-D;A-E;A-F;B-C;B-D;B-E;B-F;C-D;C-E;C-F;D-E;D-F;E-F;',
     '6-cycle': 'A-B;B-C;C-D;D-E;E-F;F-A;',
     # 7 nodes
+    '6-star': 'A-B;A-C;A-D;A-E;A-F;A-G;',
     # '7-clique': 'A-B;A-C;A-D;A-E;A-F;A-G;B-C;B-D;B-E;B-F;B-G;C-D;C-E;C-F;C-G;D-E;D-F;D-G;E-F;E-G;F-G;',
     '7-cycle': 'A-B;B-C;C-D;D-E;E-F;F-G;G-A;',
     # 8 nodes
@@ -98,16 +101,16 @@ if __name__ == '__main__':
     os.makedirs(f'./tmp/graphs', exist_ok=True)
 
     graph_dataset_names = [
-        'MUTAG',
+        # 'MUTAG',
         'PTC_MR',
         # 'NCI1',
         'PROTEINS',
-        'IMDB-BINARY',
+        # 'IMDB-BINARY',
         # 'IMDB-MULTI',
         # 'REDDIT-BINARY',
         # 'REDDIT-MULTI-5K',
         # 'COLLAB',
-        'DD',
+        # 'DD',
         'ENZYMES']
     for dataset_name in graph_dataset_names:
         dataset = TUDataset('../data/TUDataset', dataset_name, use_node_attr=True)

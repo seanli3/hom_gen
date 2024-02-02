@@ -1,3 +1,0 @@
-format,dataset,task,task_type,node_encoder,edge_encoder,trans,l_pre,l_mp,l_post,dim_in,hops,pool,dropout,walk,epoch,loss,loss_std,params,time_iter,time_iter_std,mae,mae_std,mse,mse_std,rmse,rmse_std
-PyG,ZINC,graph,regression,False,False,True,1,2,1,128,2,sum,0.8,bfs,322,1.7816,0.0224,6153.0,1.0466,0.0615,0.8001,0.0069,1.7818,0.0225,1.3348,0.0084
-PyG,ZINC,graph,regression,False,False,True,2,2,1,128,2,sum,0.8,bfs,256,1.7344,0.0131,22794.0,1.0545,0.0399,0.7782,0.0022,1.7345,0.0131,1.317,0.005

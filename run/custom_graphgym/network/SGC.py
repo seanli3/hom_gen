@@ -14,11 +14,27 @@ class SGC(torch.nn.Module):
     def __init__(self, dim_in, dim_out):
         super().__init__()
         conv_model = pyg_nn.SGConv
+        if cfg.dataset.task == 'graph':
+            self.pooling_fun = register.pooling_dict[cfg.model.graph_pooling]
+            self.post_mp = nn.Sequential(
+                nn.Linear(cfg.gnn.dim_inner, cfg.gnn.dim_inner),
+                nn.BatchNorm1d(cfg.gnn.dim_inner, track_running_stats=False),
+                nn.ReLU(inplace=True),
+                nn.Linear(cfg.gnn.dim_inner, dim_out),
+            )
         self.convs = nn.ModuleList()
-        self.convs.append(conv_model(dim_in, dim_in, K=cfg.gnn.layers_mp))
 
-        GNNHead = register.head_dict[cfg.dataset.task]
-        self.post_mp = GNNHead(dim_in=dim_in, dim_out=dim_out)
+        if cfg.dataset.task == 'graph':
+            self.convs.append(conv_model(dim_in, cfg.gnn.dim_inner, K=cfg.gnn.layers_mp, bias=False))
+        else:
+            self.convs.append(conv_model(dim_in, dim_out, K=cfg.gnn.layers_mp, bias=False))
+
+    def _apply_index(self, batch):
+        if cfg.dataset.task == 'graph':
+            return batch.graph_feature, batch.y
+        mask = '{}_mask'.format(batch.split)
+        return batch.x[batch[mask]], \
+            batch.y[batch[mask]]
 
     def forward(self, batch):
         x, edge_index = batch.x, batch.edge_index
@@ -28,6 +44,11 @@ class SGC(torch.nn.Module):
             x = F.dropout(x, p=cfg.gnn.dropout, training=self.training)
 
         batch.x = x
-        batch = self.post_mp(batch)
-
-        return batch
+        if cfg.dataset.task == 'graph':
+            x = self.pooling_fun(batch.x, batch.batch)
+            x = self.post_mp(x)
+            batch.x = x
+            return batch.x, batch.y
+        else:
+            pred, label = self._apply_index(batch)
+            return pred, label

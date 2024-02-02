@@ -6,7 +6,7 @@ seed: 41
 dataset:
   format: PyG
   dir: ../data
-  name: Chameleon
+  name: Cora
   task: node
   task_type: classification
   transductive: true
@@ -18,7 +18,7 @@ train:
   ckpt_period: 2000
   enable_ckpt: false
 model:
-  type: GCN
+  type: SGC
   loss_fun: cross_entropy
   graph_pooling: add
 gnn:

@@ -5,8 +5,7 @@
 
 
 dataset.name dataset ['Cora','CiteSeer','PubMed']
-model.type type ['GCN','GAT','GraphSage']
-gnn.layers_mp l_mp [1,2,3,4,5]
-gnn.dim_inner dim_in [64,128]
-gnn.dropout dropout [0.2,0.5,0.8]
+model.type type ['SGC']
+gnn.layers_mp l_mp [1,2,3,4,5,6]
+gnn.dim_inner dim_in [64]
 

@@ -7,16 +7,21 @@ import numpy as np
 from matplotlib import pyplot as plt
 
 def read_data(gap_sheet='Node New Split New Gap', hom_gap_sheet='Node Hom New Split New',
-              bound_file='./new_bounds.csv', pattern='1-WL', type='GCN'):
-    data = pd.read_excel('./hom_gen.xlsx', sheet_name=gap_sheet)
-    data['pattern'] = pattern
-    no_hom_data = data[data['type']=='GCN']
-    # no_hom_data = no_hom_data.iloc[no_hom_data.groupby(['dataset','pattern', 'l_mp'])['val_acc'].idxmax()]
-
+              bound_file='./new_bounds.csv', pattern='1-WL', type='GCN', c_type='HOM'):
+    no_hom_data = None
+    if gap_sheet:
+        data = pd.read_excel('./hom_gen.xlsx', sheet_name=gap_sheet)
+        data['pattern'] = pattern
+        no_hom_data = data[data['type']=='GCN']
+        # no_hom_data = no_hom_data.iloc[no_hom_data.groupby(['dataset','pattern', 'l_mp'])['val_acc'].idxmax()]
     hom_data = pd.read_excel('./hom_gen.xlsx', sheet_name=hom_gap_sheet)
-    hom_data = hom_data[hom_data['type']==type]
+    hom_data = hom_data[(hom_data['type']==type) & (hom_data['c_type'] == c_type)]
+    hom_data = hom_data.reset_index()
     hom_data = hom_data.iloc[hom_data.groupby(['dataset','pattern','l_mp'])['val_acc'].idxmax()]
-    best_val_record = pd.concat([no_hom_data, hom_data])
+    if no_hom_data is not None:
+        best_val_record = pd.concat([no_hom_data, hom_data])
+    else:
+        best_val_record = hom_data
 
     bounds = pd.read_csv(bound_file, delimiter=' ')
     # bounds2 = pd.read_csv('./new_bounds.csv', delimiter=' ')
@@ -152,8 +157,8 @@ def plot_patterns(df, save=False, dataset='ENZYMES', patterns=[
         labels[1].append(f'{patterns[d]} bound')
 
     if legend:
-        ax1.legend(list(chain(*lns))[2:4], legends, loc="upper right", fontsize=15, ncols=1)
-    # ax1.set_ylabel('Acc. gap', fontsize=15)
+        ax1.legend(list(chain(*lns))[:4], legends, loc="upper right", fontsize=14, ncols=1)
+    ax1.set_ylabel('Acc. gap', fontsize=15)
     ax1.set_ylim(y1lim)
     ax1.tick_params(axis='x', labelsize=14)
     ax1.tick_params(axis='y', labelsize=14)
@@ -161,7 +166,7 @@ def plot_patterns(df, save=False, dataset='ENZYMES', patterns=[
     ax1.set_yticks(np.arange(y1lim[0], y1lim[1], math.ceil((y1lim[1]-y1lim[0])/4*10)/10))
     ax2.set_ylim(y2lim)
     ax2.set_yticks(np.arange(y2lim[0], y2lim[1], math.ceil((y2lim[1]-y2lim[0])/4*10)/10))
-    ax2.set_ylabel('Bound value', fontsize=15)
+    # ax2.set_ylabel('Bound value', fontsize=15)
 
     ax1.set_xticks([-0.32,-0.16,0.,0.16])
     def format_fn(tick_val, tick_pos):
@@ -185,8 +190,8 @@ def plot_patterns(df, save=False, dataset='ENZYMES', patterns=[
 
 # df = read_data(gap_sheet='Node New Split New Gap', hom_gap_sheet='Node Hom New Split New',
 #                bound_file='./node_bounds.csv', pattern='1-WL', type='GCN')
-# plot_layers(df, datasets=['PubMed', 'Cora', 'CiteSeer'], y1lim=(0., 0.5), y2lim=(0.0, 0.8))
-# plot_patterns(df, save=True, y1lim=(10, 16), y2lim=(0, 4), layer=4, dataset='PubMed',  legends=[
+# # plot_layers(df, datasets=['PubMed', 'Cora', 'CiteSeer'], y1lim=(0., 0.5), y2lim=(0.0, 0.8))
+# plot_patterns(df, save=True, y1lim=(10, 16), y2lim=(0, 5), layer=4, dataset='PubMed',  legends=[
 #              'None',
 #              r'$P_2$,$P_3$,$P_4$,$P_5$',
 #              r'$K_3$,$K_4$,$K_5$,$K_6$',
@@ -207,6 +212,135 @@ def plot_patterns(df, save=False, dataset='ENZYMES', patterns=[
 #             r'$C_3$,$C_4$,$C_5$,$C_6$',
 #         ])
 
+df = read_data(gap_sheet='Graph 0.9-0.1 split', hom_gap_sheet='Graph 0.9-0.1 Hom',
+               bound_file='./graph_bounds_hom.csv', pattern='1-WL', type='GCN', c_type='HOM')
+# plot_layers(df, save=False, datasets=['PROTEINS', 'ENZYMES'], y1lim=(0.0, 1), y2lim=(0.0, 27), layers=np.arange(1,6))
+plot_patterns(df, save=True, y1lim=(6., 74), y2lim=(16, 56), layer=4, dataset='ENZYMES',
+legends=[
+    ], legend=False)
+# plot_patterns(df, save=True, y1lim=(6, 74), y2lim=(16, 56), layer=4, dataset='PROTEINS', legends=[
+#             'None',
+#             r'$P_2$,$P_3$,$P_4$,$P_5$',
+#             r'$K_3$,$K_4$,$K_5$,$K_6$',
+#             r'$C_3$,$C_4$,$C_5$,$C_6$',
+#         ])
+
+
+def plot_hom_iso(df_hom, df_iso, layer, dataset, ylim, patterns=[
+    '2-path,3-path,4-path,5-path',
+    'triangle,4-cycle,5-cycle,6-cycle',
+        'triangle,4-clique,5-clique,6-clique',
+] , save=False, legends=None):
+    gap = 0.16
+    width = 0.15
+    colors = plt.get_cmap('Set2')
+    fig = plt.figure(figsize=(4, 3))
+    ax1 = fig.add_subplot(111)
+    df_hom = df_hom[(df_hom.l_mp==layer) & (df_hom.dataset==dataset) & (df_hom.c_type=='HOM')]
+    df_iso = df_iso[(df_iso.l_mp==layer) & (df_iso.dataset==dataset) & (df_iso.c_type=='ISO')]
+
+    lns = [[],[]]
+    labels = [[],[]]
+    x = 0
+    for d in range(len(patterns)):
+        lns1 = ax1.bar(
+            x - gap + gap*d,
+            df_hom[df_hom.pattern==patterns[d]].bound,
+            width,
+            yerr=df_hom[df_hom.pattern==patterns[d]].bound_std,
+            hatch=None, color=colors(d+1))
+        lns2 = ax1.bar(
+            x + 2*math.ceil(len(patterns)/2)*gap + gap*d + 0.1,
+            df_iso[df_iso.pattern==patterns[d]].bound,
+            width,
+            yerr=df_iso[df_iso.pattern==patterns[d]].bound_std,
+            hatch='\\', color=colors(d+1), alpha=0.8)
+        lns[0].append(lns1[0])
+        lns[1].append(lns2[0])
+        labels[0].append(f'{patterns[d]} gap')
+        labels[1].append(f'{patterns[d]} bound')
+
+    if legends is not None:
+        ax1.legend(list(chain(*lns))[:4], legends, loc="upper right", fontsize=15, ncols=1)
+    ax1.set_ylabel('Bound value', fontsize=15)
+    ax1.tick_params(axis='x', labelsize=14)
+    ax1.tick_params(axis='y', labelsize=14)
+    ax1.set_yticks(np.arange(ylim[0], ylim[1], math.ceil((ylim[1]-ylim[0])/4*10)/10))
+    ax1.set_ylim(ylim)
+    ax1.grid(axis='y')
+
+    # ax1.set_xticks([-0.32,-0.16,0.,0.16])
+    def format_fn(tick_val, tick_pos):
+        if tick_pos == 1:
+            return 'Hom'
+        if tick_pos == 2:
+            return 'Subgraph'
+        else:
+            return None
+
+    from matplotlib.ticker import MaxNLocator
+    ax1.xaxis.set_major_formatter(format_fn)
+    ax1.xaxis.set_major_locator(MaxNLocator(integer=True))
+
+    fig.tight_layout()
+    if save:
+        plt.savefig('./img/graph_patterns.pdf', bbox_inches='tight', format='pdf')
+    else:
+        plt.show()
+
+
+# df_hom = read_data(gap_sheet='Graph 0.9-0.1 split', hom_gap_sheet='Graph 0.9-0.1 Hom',
+#                    bound_file='./graph_bounds_hom.csv', type='GCN', c_type='HOM')
+# df_iso = read_data(gap_sheet='Graph 0.9-0.1 split', hom_gap_sheet='Graph 0.9-0.1 Hom',
+#                    bound_file='./graph_bounds_iso.csv', type='GCN', c_type='ISO')
+# layer = 4
+# plot_hom_iso(df_hom, df_iso, layer, 'ENZYMES', ylim=[33,41], save=True)
+
+# plot_hom_iso(df_hom, df_iso, layer, 'PTC_MR', ylim=[20,30])
+
+# df_hom = read_data(gap_sheet='Node New Split New Gap', hom_gap_sheet='Node Hom New Split New',
+#                    bound_file='./node_bounds.csv', type='GCN', c_type='HOM')
+# df_iso = read_data(gap_sheet='Node New Split New Gap', hom_gap_sheet='Node Hom New Split New',
+#                    bound_file='./node_bounds_iso.csv', type='GCN', c_type='ISO')
+# layer = 4
+# plot_hom_iso(df_hom, df_iso, layer, 'PubMed', ylim=[1,3.1], save=False,
+#              legends=[
+#                 r'$P_2$,$P_3$,$P_4$,$P_5$',
+#              r'$C_3$,$C_4$,$C_5$,$C_6$',
+#             r'$K_3$,$K_4$,$K_5$,$K_6$',
+#              ])
+
+
+# plot_patterns(df_hom, save=False, y1lim=(0., 68), y2lim=(0, 64), layer=4, dataset='ENZYMES',
+# legends=[
+#             'None',
+#             r'$P_2$,$P_3$,$P_4$,$P_5$',
+#     ], patterns=[
+#         'triangle,4-cycle,5-cycle,6-cycle'
+#     ])
+# plot_patterns(df_iso, save=False, y1lim=(0., 68), y2lim=(0, 64), layer=4, dataset='ENZYMES',
+#               legends=[
+#                   'None',
+#                   r'$P_2$,$P_3$,$P_4$,$P_5$',
+#               ], patterns=[
+#         'triangle,4-cycle,5-cycle,6-cycle'
+#     ])
+# plot_patterns(df, save=True, y1lim=(0., 68), y2lim=(0, 64), layer=4, dataset='PROTEINS', legends=[
+#             r'$K_3$,$K_4$,$K_5$,$K_6$',
+#             r'$C_3$,$C_4$,$C_5$,$C_6$',
+#         ])
+#
+
+
+# df = read_data(gap_sheet=None, hom_gap_sheet='PATTERN',
+#                bound_file='./PATTERN.csv', pattern='1-WL', type='GCN')
+# plot_patterns(df, save=True, y1lim=(0., 11), y2lim=(0.8, 3), layer=16, dataset='SBM_PATTERN',
+#               patterns=['none','34Cl','345Cl'],
+#             legends=[
+#             'None',
+#             r'$K_3$,$K_4$',
+#             r'$K_3$,$K_4$,$K_5$',
+# ])
 
 # plot('Cora', (0.01, 0.25), (0.0, 1.6), '1-WL')
 # plot('CiteSeer', (0.0, 0.4), (0.0, 1.4), '1-WL')

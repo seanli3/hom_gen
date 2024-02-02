@@ -4,9 +4,12 @@ import os
 import subprocess
 
 patterns = OrderedDict({
+    # 2 nodes
+    '1-path': 'A-B;',
     # 3 nodes
     '2-path': 'A-B;B-C;',
     'triangle': "A-B;B-C;C-A;",
+    '2-star': 'A-B;A-C;',
     # 4 nodes
     '3-path': 'A-B;B-C;C-D;',
     '3-star': 'A-B;A-C;A-D;',
@@ -29,6 +32,8 @@ patterns = OrderedDict({
     # 'chordal-square-edge': "A-B;B-C;C-D;D-A;B-D;A-E;",
     # '4-clique-edge': "A-B;B-C;C-D;D-A;A-C;B-D;A-E;",
     # 6 nodes
+    '5-path': 'A-B;B-C;C-D;D-E;E-F;',
+    '5-star': 'A-B;A-C;A-D;A-E;A-F;',
     # 'quad-triangle': "A-B;B-C;C-D;D-E;E-F;F-A;B-D;B-E;B-F;",
     # 'triangle-core': "A-B;B-C;C-D;D-E;E-F;F-A;B-D;B-F;D-F;",
     # 'twin-c-square': "A-B;B-C;C-D;D-E;E-F;F-A;A-C;A-D;D-F;",
@@ -38,17 +43,18 @@ patterns = OrderedDict({
     '6-clique': 'A-B;A-C;A-D;A-E;A-F;B-C;B-D;B-E;B-F;C-D;C-E;C-F;D-E;D-F;E-F;',
     '6-cycle': 'A-B;B-C;C-D;D-E;E-F;F-A;',
     # 7 nodes
+    # '6-star': 'A-B;A-C;A-D;A-E;A-F;A-G;',
     # '7-clique': 'A-B;A-C;A-D;A-E;A-F;A-G;B-C;B-D;B-E;B-F;B-G;C-D;C-E;C-F;C-G;D-E;D-F;D-G;E-F;E-G;F-G;',
-    '7-cycle': 'A-B;B-C;C-D;D-E;E-F;F-G;G-A;',
+    # '7-cycle': 'A-B;B-C;C-D;D-E;E-F;F-G;G-A;',
     # 8 nodes
     # '8-clique': 'A-B;A-C;A-D;A-E;A-F;A-G;A-H;B-C;B-D;B-E;B-F;B-G;B-H;C-D;C-E;C-F;C-G;C-H;D-E;D-F;D-G;D-H;E-F;E-G;E-H;F-G;F-H;G-H;',
-    '8-cycle': 'A-B;B-C;C-D;D-E;E-F;F-G;G-H;H-A;',
+    # '8-cycle': 'A-B;B-C;C-D;D-E;E-F;F-G;G-H;H-A;',
     # 9 nodes
     # '9-clique': 'A-B;A-C;A-D;A-E;A-F;A-G;A-H;A-I;B-C;B-D;B-E;B-F;B-G;B-H;B-I;C-D;C-E;C-F;C-G;C-H;C-I;D-E;D-F;D-G;D-H;D-I;E-F;E-G;E-H;E-I;F-G;F-H;F-I;G-H;G-I;H-I;',
-    '9-cycle': 'A-B;B-C;C-D;D-E;E-F;F-G;G-H;H-I;I-A;',
+    # '9-cycle': 'A-B;B-C;C-D;D-E;E-F;F-G;G-H;H-I;I-A;',
     # 10 nodes
     # '10-clique': 'A-B;A-C;A-D;A-E;A-F;A-G;A-H;A-I;A-J;B-C;B-D;B-E;B-F;B-G;B-H;B-I;B-J;C-D;C-E;C-F;C-G;C-H;C-I;C-J;D-E;D-F;D-G;D-H;D-I;D-J;E-F;E-G;E-H;E-I;E-J;F-G;F-H;F-I;F-J;G-H;G-I;G-J;H-I;H-J;I-J;',
-    '10-cycle': 'A-B;B-C;C-D;D-E;E-F;F-G;G-H;H-I;I-J;J-A;',
+    # '10-cycle': 'A-B;B-C;C-D;D-E;E-F;F-G;G-H;H-I;I-J;J-A;',
 })
 
 
@@ -97,16 +103,16 @@ if __name__ == '__main__':
     os.makedirs(f'./tmp/graphs', exist_ok=True)
 
     graph_dataset_names = [
-        'MUTAG',
+        # 'MUTAG',
         'PTC_MR',
         # 'NCI1',
         'PROTEINS',
-        'IMDB-BINARY',
+        # 'IMDB-BINARY',
         # 'IMDB-MULTI',
         # 'REDDIT-BINARY',
         # 'REDDIT-MULTI-5K',
         # 'COLLAB',
-        'DD',
+        # 'DD',
         'ENZYMES']
     for dataset_name in graph_dataset_names:
         dataset = TUDataset('../data/TUDataset', dataset_name, use_node_attr=True)
@@ -123,7 +129,6 @@ if __name__ == '__main__':
         dataset = TUDataset('../data/TUDataset', dataset_name, use_node_attr=True)
         write_hom_count(dataset)
 
-    node_dataset_names = []
     for dataset_name in node_dataset_names:
         dataset = Planetoid('../data/Planetoid', dataset_name)
         write_hom_count(dataset)
