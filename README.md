@@ -11,7 +11,7 @@ or simply run `pip install -r requirements.txt`
 (you might want to remove cuda related packages if you don't have a GPU)
 
 ### Data preparation
-Download pre-computed counts from https://github.com/snap-stanford/GraphGym/tree/master/run
+Download pre-computed counts from https://drive.google.com/file/d/1At9V8Bw0xOOGoo7XFtBeIL60L5OJwk81/view?usp=drive_link
 unzip and place them under `rooted_hom_count/tmp`
 
 ### Compute data-dependent bounds
@@ -32,6 +32,14 @@ You can edit `compute_bounds.py` to compute bounds for other datasets.
   * Optionally we can pass a different grid file by change the code in `run_batch_*.sh`
 
 We use graphgym to manage batch experiments, for advanced uses please refer to https://github.com/snap-stanford/GraphGym/tree/master
+
+### Compute diameters
+* Compute by running `compute_diameter.py` in the `run` folder.
+* Save the computed diameters in `diameters.csv` file under `run`
+
+### Compute bounds
+* Run `compute_bounds.py` in the `wl` folder.
+
 
 
 ### Compute homomorphism counts
