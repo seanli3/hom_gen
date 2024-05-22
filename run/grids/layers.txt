@@ -1,0 +1,9 @@
+# Format for each row: name in config.py; alias; range to search
+# No spaces, except between these 3 fields
+# Line breaks are used to union different grid search spaces
+# Feel free to add '#' to add comments
+
+gnn.layers_mp l_mp [4]
+dataset.name dataset ['TU_ENZYMES']
+model.type model ['GCN']
+

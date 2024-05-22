@@ -1,7 +1,7 @@
 import pickle
 from itertools import combinations, chain
 from sklearn.model_selection import train_test_split
-from torch_geometric.datasets import TUDataset, Planetoid, GNNBenchmarkDataset
+from torch_geometric.datasets import TUDataset, Planetoid, GNNBenchmarkDataset, MoleculeNet
 from torch_geometric.utils import to_networkx
 from rooted_hom_count.count_hom import get_hom_count_filename, get_subgraph_count_filename, patterns as original_patterns
 import pandas as pd
@@ -19,6 +19,20 @@ from scipy.special import kl_div
 # https://mail.python.org/pipermail/scipy-user/2011-May/029521.html
 
 import numpy as np
+
+def total_variatoin(x,y):
+    # x = x / x.sum(dim=1).view(-1,1)
+    # y = y / y.sum(dim=1).view(-1,1)
+    # return 0.5*(x-y).abs().sum(dim=1).sum()/x.shape[0]
+    prod = 1
+    for i in range(x.shape[1]):
+        max_val = max(x[:,i].max().int().item(), y[:,i].max().int().item())
+        x_bins = x[:,i].long().bincount(minlength=int(max_val+1))
+        y_bins = y[:,i].long().bincount(minlength=int(max_val+1))
+        x_bins = x_bins / x_bins.sum()
+        y_bins = y_bins / y_bins.sum()
+        prod *=  1 - 0.5*np.abs(x_bins-y_bins).sum()
+    return 1 - prod
 
 def KLdivergence(x, y):
   """Compute the Kullback-Leibler divergence between two multivariate samples.
@@ -114,8 +128,17 @@ def get_dataset(dataset_name, split=[0.6, 0.4]):
             f = pickle.load(f)
             dataset_raw = f[0]
         return dataset_raw
+    elif dataset_name in ["ESOL", "FreeSolv", "Lipo", "PCBA", "MUV", "HIV", "BACE", "BBBP", "Tox21", "ToxCast", "SIDER", "ClinTox"]:
+        dataset_raw = MoleculeNet(f'{pathlib.Path(__file__).parent.resolve()}/../data', dataset_name )
+        dataset_raw.data.x = dataset_raw.data.x.float()
+        dataset_raw.data.y = dataset_raw.data.y.long()
+        if dataset_raw.data.y.shape[1] > 1:
+            dataset_raw.data.y = dataset_raw.data.y[:,21].view(-1)
+        else:
+            dataset_raw.data.y = dataset_raw.data.y.view(-1)
     else:
-        dataset_raw = TUDataset(f'{pathlib.Path(__file__).parent.resolve()}/../data/TUDataset', dataset_name, use_node_attr=True)
+        name = dataset_name.split('TU_')[1]
+        dataset_raw = TUDataset(f'{pathlib.Path(__file__).parent.resolve()}/../data/TUDataset', name, use_node_attr=True)
     if len(dataset_raw)>1:
         # graph dataset
         del dataset_raw.data.train_graph_index
@@ -192,13 +215,32 @@ def get_f_pattern_wl_features(dataset, patterns=original_patterns.keys(), iterat
                               count_func=get_graph_hom_counts):
     graph_canonical_forms = []
     colors = []
+    unique_graph_colors = set()
+    unique_node_colors = set()
     for idx in range(len(dataset)):
         graph = to_networkx(dataset[idx])
         counts = count_func(dataset.name, idx, graph.number_of_nodes(), patterns=patterns)
         canonical_form, node_color_his, graph_color_his = f_pattern_WL(graph, hom_counts=counts, verbose=False, iterations=iterations)
+        unique_graph_colors.add(tuple(canonical_form))
+        unique_node_colors.update(set(map(lambda c:c[0], graph_color_his[-1])))
         graph_canonical_forms.append(graph_color_his)
         colors.append(get_node_feature_from_colors(dataset[idx].x, node_color_his, use_node_attr=use_node_attr))
+    print('# of unique graph canonical forms: ', len(unique_graph_colors))
+    print('# of unique node colors: ', len(unique_node_colors))
     return get_features_from_canonical_forms(len(dataset), graph_canonical_forms), colors
+
+def get_pattern_counts(dataset, patterns=original_patterns.keys(), iterations=None, use_node_attr=True,
+                              count_func=get_graph_hom_counts):
+    graph_canonical_forms = []
+    features = []
+    unique_graph_colors = set()
+    unique_node_colors = set()
+    for idx in range(len(dataset)):
+        graph = to_networkx(dataset[idx])
+        counts = count_func(dataset.name, idx, graph.number_of_nodes(), patterns=patterns)
+        features.append(np.sum(np.array([list(v) for v in counts.values()]),0))
+    return np.array(features)
+
 
 def get_wl_features(dataset, iterations=None, use_node_attr=True):
     graph_canonical_forms = []
@@ -238,7 +280,7 @@ def get_fkwl_features(dataset, k=3, iterations=None, use_node_attr=True):
     return get_features_from_canonical_forms(len(dataset), graph_canonical_forms), colors
 
 
-def get_features_from_canonical_forms(num_graphs, graph_canonical_forms, normalize=True):
+def get_features_from_canonical_forms(num_graphs, graph_canonical_forms, normalize=False):
     canonical_forms = list(map(lambda c: list(chain(*c)), graph_canonical_forms))
     hist = chain(*canonical_forms)
     color_keys = sorted(list(set(map(lambda c: c[0], hist))))
@@ -251,7 +293,7 @@ def get_features_from_canonical_forms(num_graphs, graph_canonical_forms, normali
         # m = torch.mean(features, dim=0)
         # s = torch.std(features, dim=0)
         # features = (features - m) / s
-        features = torch.nn.functional.normalize(features, dim=0, p=2)
+        features = torch.nn.functional.normalize(features, dim=0, p=1)
     return features
 
 def get_node_feature_from_colors(node_attr, colors, normalize=True, use_node_attr=True):
@@ -266,7 +308,10 @@ def get_node_feature_from_colors(node_attr, colors, normalize=True, use_node_att
                 if color[1] > 1:
                     features[node, color_keys.index(color[0])] = color[1]
     if use_node_attr:
-        features = torch.cat((node_attr, features), 1)
+        if node_attr is not None:
+            features = torch.cat((node_attr, features), 1)
+        else:
+            features = features
     if normalize:
         # features = torch.log10(features)
         # # set -inf to -1
@@ -279,41 +324,52 @@ def get_node_feature_from_colors(node_attr, colors, normalize=True, use_node_att
     return features
 
 
-def compute_graph_bound(num_classes, graph_features, y, train_idx=None, seed=1, lip_margin_constant=3):
+def compute_graph_bound(num_classes, graph_features, y, phi_diameters, train_idx=None, seed=1, lip_margin_constant=1):
     bounds = []
     np.random.seed(seed)
     delta = 0.01
     m = 0
+    dtvs = []
+    interclass_dtvs = []
     for c in range(num_classes):
         candidates = train_idx if train_idx is not None else torch.range(len(y))
         candidates = candidates[y[candidates] == c]
         sample_size = min(len(candidates), 100)
         c_idx = np.random.choice(candidates, sample_size, replace=False)
         num_samples = int(len(c_idx) / 2)
-        dkl = KLdivergence(
+        dtv = total_variatoin(
             graph_features[c_idx[:num_samples]],
             graph_features[c_idx[num_samples:num_samples * 2]],
         )
-        dist = torch.cdist(graph_features[c_idx], graph_features[c_idx])
-        diameter = dist.max().item()
-        dkl_tilde = diameter * math.sqrt(min(dkl / 2, 1 - torch.exp(-torch.tensor(dkl)))) / num_samples
-        print(f'dkl: {dkl}, diameter: {diameter}, dkl_tilde: {dkl_tilde}')
-        bound = (dkl_tilde +
-                 2 * diameter * math.sqrt(
+        diameter = phi_diameters[c]
+        # print(f'dtv: {dtv}, diameter: {diameter}')
+        bound = lip_margin_constant*diameter*(dtv +
+                 2 * math.sqrt(
                     math.log(2 * num_classes / delta, 10) /
                     (num_samples * math.floor(len(candidates) / 2 / num_samples))
-                )) * lip_margin_constant
+                ))
         bounds.append(bound)
         m += math.floor(len(candidates) / 2 / num_samples)
+        dtvs.append(dtv.item())
+
+        negative_candidates = train_idx if train_idx is not None else torch.range(len(y))
+        negative_candidates = negative_candidates[y[negative_candidates] != c]
+        negative_sample_size = min(len(candidates), len(negative_candidates))
+        n_dtv = total_variatoin(
+            graph_features[np.random.choice(candidates, negative_sample_size, replace=False)],
+            graph_features[np.random.choice(negative_candidates, negative_sample_size, replace=False)],
+        )
+        interclass_dtvs.append(n_dtv)
+
     bound = sum(bounds) / len(bounds) + math.sqrt(math.log(2 / delta) / 2 / m)
     # print(f'bound: {bound}')
-    return bound
+    return bound, dtvs, phi_diameters, interclass_dtvs
 
 
-def get_bound_graph(dataset, get_graph_feature_func, train_idx=None, seed=1):
+def get_bound_graph(dataset, phi_diamters, get_graph_feature_func, train_idx=None, seed=1):
     np.random.seed(seed)
     features, _ = get_graph_feature_func()
-    return compute_graph_bound(dataset.num_classes, features, dataset.data.y, train_idx=train_idx, seed=seed)
+    return compute_graph_bound(dataset.num_classes, features, dataset.data.y, phi_diamters, train_idx=train_idx, seed=seed)
 
 def compute_node_bound(num_classes, node_features, y, train_idx=None, seed=1, lip_margin_constant=6):
     np.random.seed(seed)
@@ -327,7 +383,7 @@ def compute_node_bound(num_classes, node_features, y, train_idx=None, seed=1, li
         c_idx = np.random.choice(candidates, sample_size, replace=False)
         num_samples = int(len(c_idx)/2)
         if len(node_features.shape) > 1:
-            dkl = KLdivergence(
+            dtv = total_variatoin(
                 node_features[c_idx[:num_samples]],
                 node_features[c_idx[num_samples:num_samples * 2]],
             )
@@ -335,12 +391,12 @@ def compute_node_bound(num_classes, node_features, y, train_idx=None, seed=1, li
             min_val = node_features.min()
             # scale to positive numbers
             node_features -= min_val + 1e-5
-            dkl = sum(kl_div(node_features[c_idx[:num_samples]], node_features[c_idx[num_samples:num_samples * 2]]))
+            dtv = sum(kl_div(node_features[c_idx[:num_samples]], node_features[c_idx[num_samples:num_samples * 2]]))
             node_features = node_features.view(-1,1)
         dist = torch.cdist(node_features[c_idx], node_features[c_idx])
         diameter = dist.max().item()
-        dkl_tilde = diameter*math.sqrt(min(dkl/2, 1-torch.exp(-torch.tensor(dkl))))/num_samples
-        print(f'dkl: {dkl}, diameter: {diameter}, dkl_tilde: {dkl_tilde}')
+        dkl_tilde = diameter*math.sqrt(min(dtv/2, 1-torch.exp(-torch.tensor(dtv))))/num_samples
+        print(f'dtv: {dtv}, diameter: {diameter}, dkl_tilde: {dkl_tilde}')
         bound = (dkl_tilde +
                  2*diameter*math.sqrt(
                     math.log(2*num_classes/delta, 10)/
@@ -435,14 +491,14 @@ def run_pattern_tests(dataset_name, iterations=None, seed=1, use_node_attr=True,
         sample_size = min(len(candidates), 300)
         c_idx = np.random.choice(candidates, sample_size, replace=False)
         num_samples = int(len(c_idx)/2)
-        dkl = KLdivergence(
+        dtv = total_variatoin(
             node_features[c_idx[:num_samples]],
             node_features[c_idx[num_samples:num_samples * 2]],
         )
         dist = torch.cdist(node_features[c_idx], node_features[c_idx])
         diameter = dist.max().item()
-        dkl_tilde = diameter*math.sqrt(min(dkl/2, 1-torch.exp(-torch.tensor(dkl))))/num_samples
-        print(f'dkl: {dkl}, diameter: {diameter}, dkl_tilde: {dkl_tilde}')
+        dkl_tilde = diameter*math.sqrt(min(dtv/2, 1-torch.exp(-torch.tensor(dtv))))/num_samples
+        print(f'dtv: {dtv}, diameter: {diameter}, dkl_tilde: {dkl_tilde}')
         bound = (dkl_tilde +
                  2*diameter*math.sqrt(
                     math.log(2*num_classes/delta, 10)/
@@ -455,27 +511,37 @@ def run_pattern_tests(dataset_name, iterations=None, seed=1, use_node_attr=True,
     res.append((dataset_name, final_bound))
     return res
 
+def get_phi_diameters(model, dataset_name, iteration):
+    from pandas import read_csv
+    csv = read_csv('./run/diameters.csv', header=None)
+    diameters = csv[(csv[0]==model) & (csv[1] == f'{dataset_name.upper()}') & (csv[2]=='diameter mean') & (csv[3] == '{} layer'.format(iteration))].values.flatten().tolist()[5:]
+    if len(diameters) == 0:
+        raise ValueError('No diameters found')
+    return diameters
+
 def run_graph_tests(dataset_name, iterations=None, seed=1, use_node_attr=True, c_type='HOM'):
     res = []
     dataset = get_dataset(dataset_name)
     print(f'iterations: {iterations}')
-    one_wl_bound = get_bound_graph(dataset, train_idx=dataset.data.train_graph_index, seed=seed,
+    phi_diameters = get_phi_diameters('GCN', dataset_name, iterations)
+    one_wl_bound, dtvs, diameters, ndtvs = get_bound_graph(dataset, phi_diameters, train_idx=dataset.data.train_graph_index, seed=seed,
                                   get_graph_feature_func=lambda: get_wl_features(dataset, iterations=iterations, use_node_attr=use_node_attr))
-    print('1-WL:' + str(one_wl_bound))
-    res.append(['1-WL', one_wl_bound])
+    print(f'1-WL, bound: {one_wl_bound}, dtvs: {dtvs}, diameters: {diameters}, ndtvs: {ndtvs}')
+    res.append(['1-WL', one_wl_bound, dtvs, diameters, ndtvs])
     print('F-pattern WL:')
     # for patterns in combinations(list(original_patterns.keys()),1):
-    # for patterns in [['3-star']]:
+    # for patterns in [['triangle'], ['4-cycle'], ['chordal-square'], ['4-clique'], ['5-cycle'], ['5-clique'], ['6-clique'], ['6-cycle']]:
     for patterns in [
-        ['2-path', '3-path', '4-path', '5-path'], ['triangle', '4-cycle', '5-cycle', '6-cycle'],
-        ['triangle', '4-clique', '5-clique', '6-clique']
+        ['2-path','3-path','4-path','5-path'], ['triangle','4-cycle','5-cycle','6-cycle'], ['triangle','4-clique','5-clique','6-clique']
     ]:
-        f_wl_bound = get_bound_graph(dataset, train_idx=dataset.data.train_graph_index, seed=seed,
-                                    get_graph_feature_func=lambda: get_f_pattern_wl_features(dataset, patterns=patterns,
-                                    iterations=iterations, use_node_attr=use_node_attr,
-                                    count_func=get_graph_hom_counts if c_type=='HOM' else get_graph_subgraph_counts))
-        print(f'patterns: {patterns}, bound: {f_wl_bound}')
-        res.append([patterns, f_wl_bound])
+        phi_diameters = get_phi_diameters('GCN-'+','.join(patterns), dataset_name, iterations)
+        f_wl_bound, dtvs, diameters, ndtvs = get_bound_graph(dataset, phi_diameters, train_idx=dataset.data.train_graph_index, seed=seed,
+                get_graph_feature_func=lambda: get_f_pattern_wl_features(dataset, patterns=patterns,
+                                                    iterations=iterations, use_node_attr=use_node_attr,
+                                                    count_func=get_graph_hom_counts if c_type=='HOM' else get_graph_subgraph_counts)
+                                                             )
+        print(f'patterns: {patterns}, bound: {f_wl_bound}, dtvs: {dtvs}, diameters: {diameters}, ndtvs: {ndtvs}')
+        res.append(['F-WL-'+','.join(patterns), f_wl_bound, dtvs, diameters, ndtvs])
     # print('3-WL:')
     # get_bound_graph(dataset, get_graph_feature_func=lambda : get_kwl_features(dataset, k=3, iterations=iterations))
     # print('3-FWL:')
@@ -536,7 +602,7 @@ def run_graph_tests_sgc(dataset_name, K=1, seed=1, c_type='HOM', normalize=True)
         s = torch.std(graph_features, dim=0)
         graph_features = (graph_features - m) / s
         graph_features = torch.nn.functional.normalize(graph_features, dim=0, p=2)
-    bound_val = compute_graph_bound(dataset.num_classes, graph_features, dataset.data.y, train_idx=dataset.data.train_graph_index, seed=seed, lip_margin_constant=3)
+    bound_val, _, __, ___ = compute_graph_bound(dataset.num_classes, graph_features, dataset.data.y, train_idx=dataset.data.train_graph_index, seed=seed, lip_margin_constant=3)
     print(f'K: {K}, bound: {bound_val}')
     res.append([K, bound_val])
     return res
@@ -549,24 +615,53 @@ if __name__ == '__main__':
     if os.path.exists(filepath):
         os.remove(filepath)
     # iterations = [7]
-    iterations = [2,3,4,5]
-    with open(filepath, 'a') as f:
-        f.writelines('dataset iteration patterns bound bound_std\n')
+    iterations = range(6,7)
+    with open(filepath, 'w+') as f:
+        f.writelines('dataset iteration patterns bound bound_std dtv dtv_std diameter diameter_std ndtv ndtv_std dtv_ratio_mean dtv_ratio_std\n')
         # for dataset in ['SBM_PATTERN','SBM_PATTERN_345Cl','SBM_PATTERN_34Cl','SBM_PATTERN_5Cl']:
         # for dataset in ['SBM_PATTERN_345Cl','SBM_PATTERN_34Cl','SBM_PATTERN_5Cl']:
-        for dataset in ['ENZYMES','PROTEINS','PTC_MR']:
-        # for dataset in ['Cora','CiteSeer','PubMed']:
+        for dataset in ['TU_PROTEINS']:
             print(dataset)
             for iteration in iterations:
                 bounds = defaultdict(list)
+                diameters = defaultdict(list)
+                dtvs = defaultdict(list)
+                ndtvs = defaultdict(list)
                 for repeat in range(1):
-                    res = run_pattern_tests(dataset, iterations=iteration, seed=1+repeat, use_node_attr=True, c_type='HOM')
-                    # res = run_graph_tests(dataset, iterations=iteration, seed=1+repeat, use_node_attr=True, c_type='ISO')
+                    # res = run_pattern_tests(dataset, iterations=iteration, seed=1+repeat, use_node_attr=True, c_type='HOM')
+                    res = run_graph_tests(dataset, iterations=iteration, seed=1+repeat, use_node_attr=False, c_type='HOM')
                     # res = run_node_tests(dataset, iterations=iteration, seed=1+repeat, use_node_attr=True, c_type='HOM')
                     # res = run_node_tests_sgc(dataset, K=iteration, seed=1+repeat, use_node_attr=True, c_type='HOM')
                     # res = run_graph_tests_sgc(dataset, K=iteration, seed=1+repeat, c_type='HOM')
                     for r in res:
                         # bounds[','.join(r[0])].append(r[1])
                         bounds[r[0]].append(r[1])
+                        dtvs[r[0]].append(r[2])
+                        diameters[r[0]].append(r[3])
+                        ndtvs[r[0]].append(r[4])
                 for key in bounds:
-                    f.writelines(f'{dataset} {iteration} {key} {np.mean(bounds[key])} {np.std(bounds[key])}\n')
+                    # Uncomment these for ENZYMES
+                    # f.writelines(f'{dataset} {iteration} {key} {np.mean(bounds[key])} {np.std(bounds[key])} \
+                    #     {float(np.array(dtvs[key]).mean(1).mean())} \
+                    #     {float(np.array(dtvs[key]).mean(1).std())} \
+                    #     {np.array(diameters[key])[:, :-1].mean(1).mean()} \
+                    #     {np.array(diameters[key])[:, :-1].mean(1).std()} \
+                    #     {",".join(map(str, filter(lambda n: not math.isnan(n), np.array(diameters[key]).mean(0).tolist())))} \
+                    #     {",".join(map(str, filter(lambda n: not math.isnan(n), np.array(diameters[key]).std(0).tolist())))} \
+                    #     {",".join(map(str, np.array(ndtvs[key]).mean(0).tolist()))} \
+                    #     {",".join(map(str, np.array(ndtvs[key]).std(0).tolist()))} \
+                    #     {float((np.array(dtvs[key])/np.array(ndtvs[key])).mean(1).mean())} \
+                    #     {float((np.array(dtvs[key])/np.array(ndtvs[key])).mean(1).std())}\n')
+
+                    # Uncomment these for other datasets
+                    f.writelines(f'{dataset} {iteration} {key} {np.mean(bounds[key])} {np.std(bounds[key])} \
+                                            {float(np.array(dtvs[key]).mean(1).mean())} \
+                                            {float(np.array(dtvs[key]).mean(1).std())} \
+                                            {np.array(diameters[key])[:, :np.isnan(np.array(diameters[key])[0]).nonzero()[0][0]-1].mean(1).mean()} \
+                                            {np.array(diameters[key])[:, :np.isnan(np.array(diameters[key])[0]).nonzero()[0][0]-1].mean(1).std()} \
+                                            {",".join(map(str, filter(lambda n: not math.isnan(n), np.array(diameters[key]).mean(0).tolist())))} \
+                                            {",".join(map(str, filter(lambda n: not math.isnan(n), np.array(diameters[key]).std(0).tolist())))} \
+                                            {",".join(map(str, np.array(ndtvs[key]).mean(0).tolist()))} \
+                                            {",".join(map(str, np.array(ndtvs[key]).std(0).tolist()))} \
+                                            {float((np.array(dtvs[key]) / np.array(ndtvs[key])).mean(1).mean())} \
+                                            {float((np.array(dtvs[key]) / np.array(ndtvs[key])).mean(1).std())}\n')

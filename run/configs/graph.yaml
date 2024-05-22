@@ -1,6 +1,8 @@
 out_dir: results
 accelerator: 'cuda'
-devices: [0]
+devices: [1]
+metric_best: loss
+metric_agg: argmin
 dataset:
   format: PyG
   dir: ../data
@@ -12,14 +14,17 @@ dataset:
   node_encoder_name: Atom
   edge_encoder: True
   edge_encoder_name: Bond
+  count_type: HOM
+  patterns: 2-path,3-path,4-path,5-path
+  add_counts: True
 train:
   batch_size: 128
-  eval_period: 2000
-  ckpt_period: 2000
-  enable_ckpt: false
+  eval_period: 1
+  ckpt_period: 1
+  enable_ckpt: true
 model:
-  type: SGC
-  loss_fun: cross_entropy
+  type: GCN
+  loss_fun: margin
   graph_pooling: add
 gnn:
   layers_pre_mp: 1
@@ -37,5 +42,5 @@ optim:
   optimizer: adam
   lr_decay: 0.
   base_lr: 0.001
-  max_epoch: 500
+  max_epoch: 400
   scheduler: none

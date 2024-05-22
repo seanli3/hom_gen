@@ -32,4 +32,4 @@ def train(model: GraphGymModule, datamodule, logger: bool = True,
     )
 
     trainer.fit(model, datamodule=datamodule)
-    trainer.test(model, datamodule=datamodule, ckpt_path="best")
+    trainer.test(model, datamodule=datamodule)

@@ -6,12 +6,13 @@ import pickle
 from torch_geometric.utils import degree
 from torch_geometric.data import InMemoryDataset
 from torch_geometric.datasets import (PPI, Amazon, Coauthor, KarateClub,
-                                      MNISTSuperpixels, Planetoid, QM7b,
+                                      MNISTSuperpixels, Planetoid, QM7b, MoleculeNet,
                                       TUDataset, LINKXDataset, WebKB, WikipediaNetwork, Actor, ZINC, Reddit2)
 from torch_geometric.graphgym.loader import load_pyg, load_ogb
 from sklearn.model_selection import train_test_split
 from rooted_hom_count.count_hom import patterns as original_patterns
 from wl.compute_bound import get_graph_hom_counts, get_graph_subgraph_counts
+from ..synthetic_dataset import SyntheticCycles
 
 
 def max_degree(graph, k):
@@ -70,12 +71,25 @@ def load_dataset(format, name, dataset_dir):
             dataset_raw.data.val_graph_index = torch.arange(len(train), len(train)+len(val))
             dataset_raw.data.test_graph_index = torch.arange(len(train)+len(val), len(train)+len(val)+len(test))
         elif name[:3] == 'TU_':
+            dataset_raw = TUDataset(dataset_dir, name[3:], use_node_attr=True)
             # TU_IMDB doesn't have node features
-            if name[3:] == 'IMDB':
-                name = 'IMDB-MULTI'
-                dataset_raw = TUDataset(dataset_dir, name, transform=T.Constant(), use_node_attr=True)
+            if dataset_raw.data.x is None:
+                dataset_raw.data.x = torch.ones((dataset_raw.data.num_nodes, 1)).float()
+                data_list = [dataset_raw.get(i) for i in dataset_raw.indices()]
+                for data in data_list:
+                    data.x = torch.ones((data.num_nodes, 1)).float()
+                dataset_raw.data, dataset_raw.slices = dataset_raw.collate(data_list)
+                del dataset_raw._data_list
+        elif name in ["ESOL", "FreeSolv", "Lipo", "PCBA", "MUV", "HIV", "BACE", "BBBP", "Tox21", "ToxCast", "SIDER", "ClinTox"]:
+            dataset_raw = MoleculeNet(dataset_dir, name )
+            dataset_raw.data.x = dataset_raw.data.x.float()
+            dataset_raw.data.y = dataset_raw.data.y.long()
+            if dataset_raw.data.y.shape[1] > 1:
+                dataset_raw.data.y = dataset_raw.data.y[:,21].view(-1)
             else:
-                dataset_raw = TUDataset(dataset_dir, name[3:], use_node_attr=True)
+                dataset_raw.data.y = dataset_raw.data.y.view(-1)
+        elif name == 'synthetic_cycles':
+            dataset_raw = SyntheticCycles(dataset_dir, name)
         else:
             dataset_raw = load_pyg(name, dataset_dir)
     elif format == 'OGB':
@@ -126,6 +140,7 @@ def add_counts(dataset_raw):
     total_counts = (total_counts - m) / s
     total_counts.nan_to_num_(-1)
     dataset_raw.data.x = torch.cat((dataset_raw.data.x, total_counts), 1)
+    # dataset_raw.data.x = total_counts
     del dataset_raw._data_list
 
 def add_splits(dataset_raw):
