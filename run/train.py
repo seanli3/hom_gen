@@ -14,9 +14,9 @@ def train(model: GraphGymModule, datamodule, logger: bool = True,
         callbacks.append(LoggerCallback())
     if cfg.train.enable_ckpt:
         if 'regression' in cfg.dataset.task_type:
-            ckpt_cbk = pl.callbacks.ModelCheckpoint(dirpath=get_ckpt_dir(), monitor='val_mae')
+            ckpt_cbk = pl.callbacks.ModelCheckpoint(dirpath=get_ckpt_dir(), save_last=True, monitor='val_mae')
         else:
-            ckpt_cbk = pl.callbacks.ModelCheckpoint(dirpath=get_ckpt_dir(), monitor='val_loss')
+            ckpt_cbk = pl.callbacks.ModelCheckpoint(dirpath=get_ckpt_dir(), save_last=True, monitor='val_loss')
         callbacks.append(ckpt_cbk)
 
     trainer_config = trainer_config or {}

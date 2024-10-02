@@ -107,6 +107,9 @@ def load_dataset(format, name, dataset_dir):
     else:
         raise ValueError('Unknown data format: {}'.format(format))
 
+    if not cfg.dataset.use_node_features:
+        dataset_raw.data.x = torch.ones((dataset_raw.data.num_nodes, 1)).float()
+
     add_splits(dataset_raw)
     if cfg.dataset.add_counts:
         add_counts(dataset_raw)
@@ -128,17 +131,20 @@ def add_counts(dataset_raw):
         for idx in range(len(dataset_raw)):
             num_nodes = dataset_raw[idx].num_nodes
             counts = get_graph_subgraph_counts(dataset_raw.name, idx, num_nodes, patterns)
+            if sum(list(map(lambda c: counts[c][0], counts))) < 1:
+                print(idx)
+
             total_counts += list(counts.values())
     else:
         raise Exception('Invalid count type')
     total_counts = torch.FloatTensor(total_counts)
-    total_counts = torch.log10(total_counts)
-    # set -inf to -1
-    total_counts.clip_(min=-1)
-    m = torch.mean(total_counts, dim=0)
-    s = torch.std(total_counts, dim=0)
-    total_counts = (total_counts - m) / s
-    total_counts.nan_to_num_(-1)
+    # total_counts = torch.log10(total_counts)
+    # # set -inf to -1
+    # total_counts.clip_(min=-1)
+    # m = torch.mean(total_counts, dim=0)
+    # s = torch.std(total_counts, dim=0)
+    # total_counts = (total_counts - m) / s
+    # total_counts.nan_to_num_(-1)
     dataset_raw.data.x = torch.cat((dataset_raw.data.x, total_counts), 1)
     # dataset_raw.data.x = total_counts
     del dataset_raw._data_list
@@ -150,16 +156,25 @@ def add_splits(dataset_raw):
         del dataset_raw.data.train_graph_index
         del dataset_raw.data.val_graph_index
         del dataset_raw.data.test_graph_index
+
         num_graphs = dataset_raw.data.y.shape[0]
 
-        train_index, val_test_index = train_test_split(torch.arange(num_graphs), test_size=1-split[0], random_state=41)
-        if len(split) == 2:
-            test_index = val_index = val_test_index
-        elif len(split) == 3:
-            val_index, test_index = train_test_split(val_test_index, test_size=split[2] / (split[1] + split[2]),
-                                                     random_state=41)
+        if dataset_raw.name != 'MCF-7':
+            train_index, val_test_index = train_test_split(torch.arange(num_graphs), test_size=1-split[0], random_state=41)
+            if len(split) == 2:
+                test_index = val_index = val_test_index
+            elif len(split) == 3:
+                val_index, test_index = train_test_split(val_test_index, test_size=split[2] / (split[1] + split[2]),
+                                                         random_state=41)
+            else:
+                raise ValueError("Invalid split")
         else:
-            raise ValueError("Invalid split")
+            import numpy as np
+            np.random.seed(41)
+            train_index = np.random.choice((dataset_raw.data.y == 0).nonzero().view(-1), 1000, replace=False)
+            train_index = np.concatenate([train_index, np.random.choice((dataset_raw.data.y == 1).nonzero().view(-1), 1000, replace=False)])
+            val_index = np.arange(num_graphs)
+            val_index = np.delete(val_index, train_index)
 
         dataset_raw.data.train_graph_index = torch.LongTensor(train_index)
         dataset_raw.data.val_graph_index = torch.LongTensor(val_index)

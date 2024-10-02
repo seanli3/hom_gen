@@ -56,6 +56,8 @@ class GNN(torch.nn.Module):
         if cfg.dataset.task == 'graph':
             x = self.pooling_fun(batch.x, batch.batch)
             x = self.post_mp(x)
+            if cfg.model.normalise_embedding:
+                x = F.normalize(x, p=1, dim=-1)
             batch.x = x
             return batch.x, batch.y
         else:

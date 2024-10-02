@@ -54,25 +54,6 @@ if __name__ == '__main__':
         train(model, datamodule, logger=True)
 
         logging.info('Run %d finished', i + 1)
-        logging.info('Training diameters')
-        dataset = create_dataset()
-        id = dataset.data['train_graph_index']
-        loader = get_loader(dataset[id], cfg.train.sampler,len(id))
-        model.eval()
-        pred, true = model(list(loader)[0])
-        diameters = []
-        dist = torch.cdist(pred, pred)
-        # diameter across all classes
-        diameters.append(dist.max().item())
-        for y in range(true.max() + 1):
-            mask = true == y
-            if mask.sum() == 0:
-                diameters.append(torch.nan)
-                continue
-            dist = torch.cdist(pred[mask], pred[mask])
-            diameter = dist.max().item()
-            diameters.append(diameter)
-        logging.info('Diameter,' + ','.join(map(str,diameters)))
 
     # Aggregate results from different seeds
     agg_runs(cfg.out_dir, cfg.metric_best)

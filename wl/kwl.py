@@ -12,26 +12,25 @@ def base_WL(verbose, n_set, initial_colors_func, find_neighbors_func, iterations
     colors = initial_colors_func(n)
     recorded_node_canonical_forms = []
     recorded_canonical_forms = []
-    old_colors = copy.deepcopy(colors)
     for i in range(iterations if iterations is not None else len(G)):
-        recorded_node_canonical_forms.append([])
+        recorded_node_canonical_forms.append({})
         for node in n:
             sorted_neigh_colors = sorted([colors[i][0] for i in find_neighbors_func(G, n, node)])
             neigh_colors = "".join(sorted_neigh_colors)
-            recorded_node_canonical_forms[i].append([*colors[node], *sorted_neigh_colors])
+            recorded_node_canonical_forms[i][node] = [*colors[node], *sorted_neigh_colors]
             colors[node].extend([neigh_colors])
         for node in n:
             recorded_node_canonical_forms[i][node] = sorted(Counter(recorded_node_canonical_forms[i][node]).items())
         # Update with the hash
-        colors = {i: [hashlib.sha224("".join(colors[i]).encode('utf-8')).hexdigest()] for i in colors}
+        colors = {j: [hashlib.sha224("".join(colors[j]).encode('utf-8')).hexdigest()] for j in colors}
 
-        if list(Counter([item for sublist in colors.values() for item in sublist]).values()) == list(
-                Counter([item for sublist in old_colors.values() for item in sublist]).values()) and i != 0:
-            recorded_node_canonical_forms.pop()
-            if verbose:
-                print(f'Converged at iteration {i}!')
-            break
-        old_colors = copy.deepcopy(colors)
+        # if list(Counter([item for sublist in colors.values() for item in sublist]).values()) == list(
+        #         Counter([item for sublist in old_colors.values() for item in sublist]).values()) and i != 0:
+        #     recorded_node_canonical_forms.pop()
+        #     if verbose:
+        #         print(f'Converged at iteration {i}!')
+        #     break
+        # old_colors = copy.deepcopy(colors)
         canonical_form = sorted(Counter([item for sublist in colors.values() for item in sublist]).items())
         recorded_canonical_forms.append(canonical_form)
     if verbose:
@@ -40,28 +39,33 @@ def base_WL(verbose, n_set, initial_colors_func, find_neighbors_func, iterations
     return canonical_form, recorded_node_canonical_forms, recorded_canonical_forms
 
 
-def WL(G, verbose=False, iterations=None):
+def WL(G, node_features=defaultdict(list), verbose=False, iterations=None):
     G = nx.convert_node_labels_to_integers(G)
 
     def n_set():
         return G, list(G.nodes())
 
+    # def set_initial_colors(n):
+    #     return {i: [hashlib.sha224("1".encode('utf-8')).hexdigest()] for i in n}
     def set_initial_colors(n):
-        return {i: [hashlib.sha224("1".encode('utf-8')).hexdigest()] for i in n}
-
+        return {
+            i: [
+                hashlib.sha224(str(node_features[i]).encode('utf-8')).hexdigest()
+            ] for i in n
+        }
     def find_neighbors(G, n, node):
         return G.neighbors(node)
 
     return base_WL(verbose, n_set, set_initial_colors, find_neighbors, iterations=iterations)
 
-def f_pattern_WL(G, hom_counts=defaultdict(list), verbose=False, iterations=None):
+def f_pattern_WL(G, node_features=defaultdict(list), hom_counts=defaultdict(list), verbose=False, iterations=None):
     G = nx.convert_node_labels_to_integers(G)
 
     def n_set():
         return G, list(G.nodes())
 
     def set_initial_colors(n):
-        return {i: [hashlib.sha224(str(hom_counts[i]).encode('utf-8')).hexdigest()] for i in n}
+        return {i: [hashlib.sha224((str(node_features[i])+str(hom_counts[i])).encode('utf-8')).hexdigest()] for i in n}
 
     def find_neighbors(G, n, node):
         return G.neighbors(node)

@@ -14,34 +14,30 @@ or simply run `pip install -r requirements.txt`
 Download pre-computed counts from https://drive.google.com/file/d/1At9V8Bw0xOOGoo7XFtBeIL60L5OJwk81/view?usp=drive_link
 unzip and place them under `rooted_hom_count/tmp`
 
-### Compute data-dependent bounds
-Run `compute_bounds.py` in the `wl` folder, results are saved in `fig/test.csv`
-You can edit `compute_bounds.py` to compute bounds for other datasets. 
-
 ### Run node and graph classification experiments
+* The scripts are in the `run` folder
 * Run a single experiement
   * Graph classification
     `sh run_single_graph.sh`
-  * Node classification
-    `sh run_single_node.sh`
+  * Optinoall change `configs/graph.yaml` to run on other datasets and different patterns
 * Run batch experiement
   * Graph classification
     `sh run_batch_graph.sh`
-  * Node classification
-    `sh run_batch_node.sh`
   * Optionally we can pass a different grid file by change the code in `run_batch_*.sh`
+* The best performing model will be saved and used in the following steps
+* We use graphgym to manage batch experiments, for advanced uses please refer to https://github.com/snap-stanford/GraphGym/tree/master
+ 
+### Compute 1-WL/F-WL graph embeddings
+* Uncomment line 601 in `compute_bound.py` in the `wl` folder
+* Change the dataset and patterns in `save_lambda_features` accordingly
+* Run `compute_bound.py`
 
-We use graphgym to manage batch experiments, for advanced uses please refer to https://github.com/snap-stanford/GraphGym/tree/master
-
-### Compute diameters
-* Compute by running `compute_diameter.py` in the `run` folder.
-* Save the computed diameters in `diameters.csv` file under `run`
-
-### Compute bounds
-* Run `compute_bounds.py` in the `wl` folder.
-
-
+### Compute generalisation bounds
+* Uncomment line 602 in `compute_bound.py` in the `wl` folder
+* Change the dataset and patterns in `print_bound` accordingly
+* Make sure the corresponding model is saved in `models` folder and 1-WL/F-WL embeddings are computed
+* Run `compute_bound.py`
 
 ### Compute homomorphism counts
 Homomorphism and subgraph counts are pre-computed and saved under `rooted_hom_count/tmp`.
-To re-compute them, following `README,md` in `rooted_hom_count` and run `compute_hom.py` or `compute_subgraph.py` in `rooted_hom_count` folder.
+To re-compute them, following `README.md` in `rooted_hom_count` and run `compute_hom.py` or `compute_subgraph.py` in `rooted_hom_count` folder.
