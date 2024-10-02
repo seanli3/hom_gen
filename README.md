@@ -18,7 +18,7 @@ unzip and place them under `rooted_hom_count/tmp`
 * The scripts are in the `run` folder
 * Run a single experiement
   * Graph classification
-    `sh run_single_graph.sh`
+    `PYTHONPATH=../ python main.py --cfg configs/graph.yaml --repeat 1 # node classification`
   * Optinoall change `configs/graph.yaml` to run on other datasets and different patterns
 * Run batch experiement
   * Graph classification
@@ -28,15 +28,15 @@ unzip and place them under `rooted_hom_count/tmp`
 * We use graphgym to manage batch experiments, for advanced uses please refer to https://github.com/snap-stanford/GraphGym/tree/master
  
 ### Compute 1-WL/F-WL graph embeddings
-* Uncomment line 601 in `compute_bound.py` in the `wl` folder
+* Uncomment line 601 in `PYTHONPATH=../ python compute_bound.py` in the `wl` folder
 * Change the dataset and patterns in `save_lambda_features` accordingly
-* Run `compute_bound.py`
+* Run `PYTHONPATH=../ python compute_bound.py`
 
 ### Compute generalisation bounds
-* Uncomment line 602 in `compute_bound.py` in the `wl` folder
+* Uncomment line 602 in `PYTHONPATH=../ python compute_bound.py` in the `wl` folder
 * Change the dataset and patterns in `print_bound` accordingly
 * Make sure the corresponding model is saved in `models` folder and 1-WL/F-WL embeddings are computed
-* Run `compute_bound.py`
+* Run `PYTHONPATH=../ python compute_bound.py`
 
 ### Compute homomorphism counts
 Homomorphism and subgraph counts are pre-computed and saved under `rooted_hom_count/tmp`.

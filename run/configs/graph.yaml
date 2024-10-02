@@ -6,7 +6,8 @@ metric_agg: argmin
 dataset:
   format: PyG
   dir: ../data
-  name: TU_ENZYMES
+  name: TU_PROTEINS
+  transductive: False
   task: graph
   task_type: classification
   split: [0.9, 0.1]
@@ -16,16 +17,18 @@ dataset:
   edge_encoder_name: Bond
   count_type: HOM
   patterns: 2-path,3-path,4-path,5-path
-  add_counts: True
+  add_counts: False
+  use_node_features: False
 train:
   batch_size: 128
-  eval_period: 1
-  ckpt_period: 1
+  eval_period: 1000
+  ckpt_period: 1000
   enable_ckpt: true
 model:
   type: GCN
   loss_fun: margin
   graph_pooling: add
+  normalise_embedding: False
 gnn:
   layers_pre_mp: 1
   layers_mp: 1
@@ -44,3 +47,4 @@ optim:
   base_lr: 0.001
   max_epoch: 400
   scheduler: none
+

@@ -8,18 +8,18 @@ patterns = OrderedDict({
     # 2 nodes
     # '1-path': 'A-B;',
     # 3 nodes
-    # '2-path': 'A-B;B-C;',
+    '2-path': 'A-B;B-C;',
     'triangle': "A-B;B-C;C-A;",
     # '2-star': 'A-B;A-C;',
     # 4 nodes
-    # '3-path': 'A-B;B-C;C-D;',
+    '3-path': 'A-B;B-C;C-D;',
     # '3-star': 'A-B;A-C;A-D;',
     '4-cycle': 'A-B;B-C;C-D;D-A;',
     # 'trailing-triangle': "A-B;B-D;D-A;C-D;",
     # 'chordal-square': "A-B;B-D;D-A;B-C;C-D;",
     '4-clique': "A-B;B-C;C-D;D-A;A-C;B-D;",
     # 5 nodes
-    # '4-path': 'A-B;B-C;C-D;D-E;',
+    '4-path': 'A-B;B-C;C-D;D-E;',
     # '4-star': 'A-B;A-C;A-D;A-E;',
     '5-cycle': 'A-B;B-C;C-D;D-E;E-A;',
     # 'house': "A-B;B-C;C-D;D-E;E-A;B-E;",
@@ -33,7 +33,7 @@ patterns = OrderedDict({
     # 'chordal-square-edge': "A-B;B-C;C-D;D-A;B-D;A-E;",
     # '4-clique-edge': "A-B;B-C;C-D;D-A;A-C;B-D;A-E;",
     # 6 nodes
-    # '5-path': 'A-B;B-C;C-D;D-E;E-F;',
+    '5-path': 'A-B;B-C;C-D;D-E;E-F;',
     # '5-star': 'A-B;A-C;A-D;A-E;A-F;',
     # 'quad-triangle': "A-B;B-C;C-D;D-E;E-F;F-A;B-D;B-E;B-F;",
     # 'triangle-core': "A-B;B-C;C-D;D-E;E-F;F-A;B-D;B-F;D-F;",

@@ -269,8 +269,8 @@ def save_wl_features(dataset, iterations=None, use_node_attr=False):
     graph_features = get_features_from_canonical_forms(graph_canonical_forms)
     # node_features = get_node_feature_from_canonical_forms(node_canonical_forms)
     for i in range(iterations):
-        torch.save(graph_features[i], f'wl/graph_features/{dataset.name}_wl_features_iter_{i+1}_node_feature={use_node_attr}.pt')
-        # torch.save(node_features[i].to_sparse_coo(), f'wl/node_features/{dataset.name}_wl_features_iter_{i+1}_node_feature={use_node_attr}.pt')
+        torch.save(graph_features[i], f'graph_features/{dataset.name}_wl_features_iter_{i+1}_node_feature={use_node_attr}.pt')
+        # torch.save(node_features[i].to_sparse_coo(), f'node_features/{dataset.name}_wl_features_iter_{i+1}_node_feature={use_node_attr}.pt')
 
 def save_kwl_features(dataset, k=3, iterations=None, use_node_attr=False):
     graph_canonical_forms = []
@@ -281,7 +281,7 @@ def save_kwl_features(dataset, k=3, iterations=None, use_node_attr=False):
 
     graph_features = get_features_from_canonical_forms(graph_canonical_forms)
     for i in range(iterations):
-        torch.save(graph_features[i], f'wl/features/{dataset.name}_{k}wl_features_iter_{i+1}.pt')
+        torch.save(graph_features[i], f'features/{dataset.name}_{k}wl_features_iter_{i+1}.pt')
 
 def save_fkwl_features(dataset, k=3, iterations=None, use_node_attr=False):
     graph_canonical_forms = []
@@ -292,7 +292,7 @@ def save_fkwl_features(dataset, k=3, iterations=None, use_node_attr=False):
         graph_canonical_forms.append(graph_color_his)
     graph_features = get_features_from_canonical_forms(graph_canonical_forms)
     for i in range(iterations):
-        torch.save(graph_features[i], f'wl/features/{dataset.name}_{k}fwl_features_iter_{i+1}.pt')
+        torch.save(graph_features[i], f'features/{dataset.name}_{k}fwl_features_iter_{i+1}.pt')
 
 
 def get_features_from_canonical_forms(graph_canonical_forms, normalize=False):
@@ -512,7 +512,7 @@ def get_phi_features(dataset_name, num_layers, repeat, normalize=False, use_node
 
     set_cfg(cfg)
     args = dotdict()
-    args.cfg_file = 'run/configs/graph.yaml'
+    args.cfg_file = '../run/configs/graph.yaml'
     args.opts = []
     load_cfg(cfg, args)
     cfg.dataset.name = dataset_name
@@ -571,7 +571,7 @@ def print_bound():
     # patterns= ['triangle,4-cycle,5-cycle,6-cycle']
     # for pattern in [['2-path', '3-path', '4-path', '5-path'], ['triangle', '4-clique', '5-clique', '6-clique'], ['triangle', '4-cycle', '5-cycle', '6-cycle']]:
     # for dataset_name in ['TU_PROTEINS','TU_ENZYMES','TU_MUTAG','BACE','SIDER']:
-    for dataset_name in ['TU_MCF-7']:
+    for dataset_name in ['TU_PROTEINS']:
         for pattern in patterns:
             print(pattern)
             # for dataset_name in ['SIDER']:
@@ -582,10 +582,10 @@ def print_bound():
             for layer in range(1,7):
                 # print(f'dataset: {dataset_name}, layer: {layer}')
                 if pattern is None:
-                    lambda_features = torch.load(f'wl/graph_features/{dataset.name}_wl_features_iter_{layer}_node_feature={use_node_attr}.pt').float()
+                    lambda_features = torch.load(f'graph_features/{dataset.name}_wl_features_iter_{layer}_node_feature={use_node_attr}.pt').float()
                 else:
-                    lambda_features = torch.load(f'wl/graph_features/{dataset.name}_wl_features_iter_{layer}_node_feature={use_node_attr}_patterns={pattern}.pt').float()
-                    # lambda_features = torch.load(f'wl/graph_features/{dataset.name}_wl_features_iter_{layer}_node_feature={use_node_attr}_patterns={pattern}.pt').to_dense()
+                    lambda_features = torch.load(f'graph_features/{dataset.name}_wl_features_iter_{layer}_node_feature={use_node_attr}_patterns={pattern}.pt').float()
+                    # lambda_features = torch.load(f'graph_features/{dataset.name}_wl_features_iter_{layer}_node_feature={use_node_attr}_patterns={pattern}.pt').to_dense()
                 if lambda_normalize:
                     lambda_features = torch.nn.functional.normalize(lambda_features, dim=1, p=1)
                 bounds, lip_fs = [], []
