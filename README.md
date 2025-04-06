@@ -1,3 +1,6 @@
+### This is the code repository for the paper in ICLR 2025 
+[Towards Bridging Generalization and Expressivity of Graph Neural Networks](https://openreview.net/pdf?id=BOQpRtI4F5)
+
 ### Installation
 * Update git submodules
 `git submodule update --init --recursive`
